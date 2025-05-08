@@ -21,6 +21,7 @@ import lombok.Setter;
  * Like account number, type (checking or savings), balance, and owner
  * Each account has a unique ID and account number
  *
+ *
  */
 
 @Entity
@@ -29,36 +30,45 @@ import lombok.Setter;
 @Setter // using lomboks library
 public class Account {
     @Id // every table needs a primary key
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // ID goes up by 1 (per user)
+    private Long id; // field for ID
 
     @Column(name = "account_number", unique = true, nullable = false)
-    private String accountNumber;
+    private String accountNumber; // field for account number
 
     @Column(name = "account_type", nullable = false)
-    private String accountType; // SAVINGS, CHECKING
+    private String accountType; // field for  accountType (SAVINGS OR CHECKINGS)
 
     @Column(nullable = false)
-    private BigDecimal balance;
+    private BigDecimal balance; // field for balance
 
     @Column(name = "account_holder_name", nullable = false)
     private String accountHolderName;
 
     @Column(nullable = true)
-    private BigDecimal apy; // Annual Percentage Yield for savings accounts
+    private BigDecimal apy; // annual Percentage Yield for savings accounts
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt; // sets the account to the local date and time
 
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt; // sets the account to the local date and time
 
     @Column(name = "last_interest_calculation")
-    private LocalDateTime lastInterestCalculation;
+    private LocalDateTime lastInterestCalculation; // sets the last interest calculation with the most update date/time
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @JoinColumn(name = "user_id", nullable = false) // FIGURE THIS OUT!!!!!!!!!!!!!!
+    private User user;  
+
+
+    /**
+     * @PrePersist: method automatically runs right before creating an account for the first time
+     * Features:
+     * Sets time when created
+     * When it's been updated which is now (just created)
+     * lastInterestCalculation tracks when interest was last calculated
+     */
 
     @PrePersist
     protected void onCreate() {
@@ -70,6 +80,11 @@ public class Account {
         }
     }
 
+    /**
+     * @PreUpdate: method runs automatically right before an existing account is updated in the database
+     * Features:
+     * It updates the "updateAt" timestamp to the current time, so we know when the last time this account was changed
+     */
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();

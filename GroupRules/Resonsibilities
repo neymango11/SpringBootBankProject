@@ -1,0 +1,300 @@
+# Project Responsibilities Breakdown
+
+## Team Member 1: User Management & Authentication
+### User Entity & Repository
+#### User.java Implementation
+- Create user entity with fields:
+  - Basic Information:
+    - Username (unique, required)
+    - Password (encrypted, required)
+    - Email (unique, required)
+    - Full Name (required)
+    - Address (required)
+    - Phone Number (required)
+  - Account Status:
+    - Active/Inactive status
+    - Account creation date
+    - Last login date
+    - Account type (regular/premium)
+  - Security:
+    - Password reset token
+    - Email verification status
+    - Failed login attempts
+    - Account lock status
+
+#### UserRepository.java Implementation
+- Create CRUD operations:
+  - Save new user
+  - Update user details
+  - Delete user
+  - Find by ID
+  - Find by username
+  - Find by email
+- Custom queries:
+  - Search users by name
+  - Filter users by status
+  - Find users by account type
+  - Get user statistics
+
+### User Service Layer
+#### User Registration & Authentication
+- Implement user registration:
+  - Validate user input
+  - Check duplicate usernames/emails
+  - Encrypt passwords
+  - Send verification email
+  - Create user profile
+- Login functionality:
+  - Authenticate credentials
+  - Handle failed attempts
+  - Generate session tokens
+  - Track login history
+
+#### User Profile Management
+- Profile updates:
+  - Update personal information
+  - Change password
+  - Update contact details
+  - Manage preferences
+- Account management:
+  - Deactivate account
+  - Reactivate account
+  - Reset password
+  - Update security settings
+
+## Team Member 2: Account Management & Transactions
+### Account Entity & Repository
+#### Account.java Implementation
+- Create account entity with:
+  - Account Information:
+    - Account number (unique, generated)
+    - Account type (Checking/Savings)
+    - Balance
+    - Interest rate
+    - Account status
+  - Transaction History:
+    - Last transaction date
+    - Transaction count
+    - Average balance
+  - Account Settings:
+    - Overdraft protection
+    - Minimum balance
+    - Interest calculation frequency
+    - Statement preferences
+
+#### AccountRepository.java Implementation
+- Create account operations:
+  - Create new account
+  - Update account details
+  - Close account
+  - Find by account number
+  - Find by user ID
+- Custom queries:
+  - Get account balance
+  - Find accounts by type
+  - Get account statistics
+  - Search accounts by criteria
+
+### Transaction Management
+#### Transaction.java Implementation
+- Create transaction entity with:
+  - Transaction Details:
+    - Transaction ID
+    - Transaction type
+    - Amount
+    - Date and time
+    - Status
+  - Additional Information:
+    - Description
+    - Reference number
+    - Related accounts
+    - Transaction category
+
+#### TransactionRepository.java Implementation
+- Create transaction operations:
+  - Record new transaction
+  - Update transaction status
+  - Find by ID
+  - Find by account
+- Custom queries:
+  - Get transaction history
+  - Filter by date range
+  - Search by type
+  - Generate reports
+
+## Team Member 3: Banking Operations & Business Logic
+### Bank Service Implementation
+#### Core Banking Operations
+
+- Deposit Operations:
+  - Validate deposit amount
+  - Update account balance
+  - Record transaction
+  - Generate receipt
+  - Update statistics
+
+- Withdrawal Operations:
+  - Check available balance
+  - Validate withdrawal amount
+  - Process withdrawal
+  - Update account
+  - Generate receipt
+
+- Transfer Operations:
+  - Validate both accounts
+  - Check sufficient funds
+  - Process transfer
+  - Update both accounts
+  - Record transactions
+
+#### Business Rules Implementation
+- Account Rules:
+  - Minimum balance requirements
+  - Overdraft limits
+  - Transaction limits
+  - Interest calculations
+  - Fee structures
+
+- Transaction Rules:
+  - Daily limits
+  - Transaction types
+  - Security checks
+  - Fraud prevention
+  - Compliance rules
+
+## Team Member 4: Admin & Security
+### Admin System Implementation
+#### Admin Entity & Service
+- Admin.java:
+  - Admin credentials
+  - Permission levels
+  - Activity logs
+  - System access rights
+  - Admin profile
+
+- AdminService.java:
+  - User management
+  - Account oversight
+  - Transaction monitoring
+  - System configuration
+  - Report generation
+
+#### Security Implementation
+- Authentication:
+  - Login system
+  - Session management
+  - Password policies
+  - Two-factor authentication
+  - Access tokens
+
+- Authorization:
+  - Role-based access
+  - Permission management
+  - Access control lists
+  - Security policies
+  - Audit logging
+
+## Team Member 5: CLI & System Integration
+### CLI Interface Implementation
+#### BankCLI.java
+- Menu System:
+  - Main menu
+  - User menu
+  - Admin menu
+  - Help system
+  - Navigation
+
+- User Interaction:
+  - Input validation
+  - Error handling
+  - Display formatting
+  - Progress indicators
+  - Confirmation dialogs
+
+#### System Integration
+- Application Configuration:
+  - Environment setup
+  - Database connection
+  - Logging configuration
+  - Security settings
+  - Performance tuning
+
+- Data Management:
+  - Initial data setup
+  - Test data generation
+  - Data validation
+  - Backup procedures
+  - Recovery processes
+
+## Shared Responsibilities
+### Code Quality
+- Code Reviews:
+  - Style consistency
+  - Best practices
+  - Performance
+  - Security
+  - Documentation
+
+### Testing
+- Unit Testing:
+  - Component tests
+  - Integration tests
+  - Performance tests
+  - Security tests
+  - User acceptance tests
+
+### Documentation
+- Technical Documentation:
+  - API documentation
+  - Code comments
+  - Architecture docs
+  - Setup guides
+  - User manuals
+
+## Communication & Collaboration
+### Daily Operations
+- Stand-up Meetings:
+  - Progress updates
+  - Blockers
+  - Next steps
+  - Team coordination
+  - Knowledge sharing
+
+### Code Management
+- Git Workflow:
+  - Branch management
+  - Commit standards
+  - Pull requests
+  - Code review
+  - Merge procedures
+
+## Quality Assurance
+### Testing Strategy
+- Unit Testing:
+  - JUnit tests
+  - Mock objects
+  - Test coverage
+  - Edge cases
+  - Error scenarios
+
+- Integration Testing:
+  - Component integration
+  - System integration
+  - Performance testing
+  - Load testing
+  - Security testing
+
+### Documentation
+- Technical Docs:
+  - API specifications
+  - Database schema
+  - System architecture
+  - Deployment guides
+  - Maintenance procedures
+
+- User Documentation:
+  - User guides
+  - Admin manuals
+  - Troubleshooting guides
+  - FAQ
+  - Release notes

@@ -1,0 +1,311 @@
+# Team Member 5: CLI & System Integration
+
+## 1. CLI Interface Implementation (BankCLI.java)
+### Main CLI Structure
+```java
+@Component
+public class BankCLI {
+    private final Scanner scanner;
+    private final BankService bankService;
+    private final UserService userService;
+    private final AdminService adminService;
+    private User currentUser;
+    private Admin currentAdmin;
+
+    public BankCLI(BankService bankService, UserService userService, AdminService adminService) {
+        this.scanner = new Scanner(System.in);
+        this.bankService = bankService;
+        this.userService = userService;
+        this.adminService = adminService;
+    }
+
+    // Main menu system
+    public void start() {
+        while (true) {
+            displayMainMenu();
+            int choice = getUserChoice();
+            processMainMenuChoice(choice);
+        }
+    }
+
+    private void displayMainMenu() {
+        System.out.println("\n=== Welcome to Banking System ===");
+        System.out.println("1. Login");
+        System.out.println("2. Register");
+        System.out.println("3. Admin Login");
+        System.out.println("4. Exit");
+        System.out.print("Enter your choice: ");
+    }
+}
+```
+
+### User Interface Components
+```java
+public class UserInterface {
+    // Menu display
+    private void displayUserMenu() {
+        System.out.println("\n=== User Dashboard ===");
+        System.out.println("1. View Accounts");
+        System.out.println("2. Deposit");
+        System.out.println("3. Withdraw");
+        System.out.println("4. Transfer");
+        System.out.println("5. View Transaction History");
+        System.out.println("6. Update Profile");
+        System.out.println("7. Logout");
+        System.out.print("Enter your choice: ");
+    }
+
+    // Account display
+    private void displayAccounts(List<Account> accounts) {
+        System.out.println("\n=== Your Accounts ===");
+        for (Account account : accounts) {
+            System.out.printf("Account: %s\n", account.getAccountNumber());
+            System.out.printf("Type: %s\n", account.getAccountType());
+            System.out.printf("Balance: $%.2f\n", account.getBalance());
+            System.out.println("-------------------");
+        }
+    }
+
+    // Transaction display
+    private void displayTransactions(List<Transaction> transactions) {
+        System.out.println("\n=== Transaction History ===");
+        for (Transaction transaction : transactions) {
+            System.out.printf("Date: %s\n", transaction.getTransactionDate());
+            System.out.printf("Type: %s\n", transaction.getType());
+            System.out.printf("Amount: $%.2f\n", transaction.getAmount());
+            System.out.println("-------------------");
+        }
+    }
+}
+```
+
+### Input Validation
+```java
+public class InputValidator {
+    // Amount validation
+    public BigDecimal validateAmount(String input) {
+        try {
+            BigDecimal amount = new BigDecimal(input);
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidInputException("Amount must be positive");
+            }
+            return amount;
+        } catch (NumberFormatException e) {
+            throw new InvalidInputException("Invalid amount format");
+        }
+    }
+
+    // Account number validation
+    public String validateAccountNumber(String input) {
+        if (!input.matches("^[A-Z0-9]{10}$")) {
+            throw new InvalidInputException("Invalid account number format");
+        }
+        return input;
+    }
+
+    // Menu choice validation
+    public int validateMenuChoice(String input, int maxChoice) {
+        try {
+            int choice = Integer.parseInt(input);
+            if (choice < 1 || choice > maxChoice) {
+                throw new InvalidInputException("Invalid menu choice");
+            }
+            return choice;
+        } catch (NumberFormatException e) {
+            throw new InvalidInputException("Invalid input format");
+        }
+    }
+}
+```
+
+## 2. System Integration
+### Application Configuration
+```java
+@Configuration
+public class ApplicationConfig {
+    @Bean
+    public CommandLineRunner commandLineRunner(BankCLI bankCLI) {
+        return args -> {
+            try {
+                bankCLI.start();
+            } catch (Exception e) {
+                System.err.println("Error starting application: " + e.getMessage());
+                System.exit(1);
+            }
+        };
+    }
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return mapper;
+    }
+}
+```
+
+### Data Initialization
+```java
+@Component
+public class DataInitializer implements CommandLineRunner {
+    @Autowired
+    private AdminService adminService;
+    @Autowired
+    private UserService userService;
+
+    @Override
+    public void run(String... args) {
+        // Create default admin
+        createDefaultAdmin();
+        // Create test data
+        createTestData();
+    }
+
+    private void createDefaultAdmin() {
+        try {
+            Admin admin = new Admin();
+            admin.setUsername("admin");
+            admin.setPassword("admin123");
+            admin.setEmail("admin@bank.com");
+            admin.setRole(AdminRole.SUPER_ADMIN);
+            adminService.createAdmin(admin);
+        } catch (Exception e) {
+            // Admin already exists
+        }
+    }
+}
+```
+
+## 3. Error Handling
+```java
+public class ErrorHandler {
+    // Display error messages
+    public void displayError(String message) {
+        System.out.println("\nError: " + message);
+        System.out.println("Press Enter to continue...");
+        scanner.nextLine();
+    }
+
+    // Handle exceptions
+    public void handleException(Exception e) {
+        if (e instanceof InvalidInputException) {
+            displayError(e.getMessage());
+        } else if (e instanceof InsufficientFundsException) {
+            displayError("Insufficient funds for this transaction");
+        } else if (e instanceof AccountNotFoundException) {
+            displayError("Account not found");
+        } else {
+            displayError("An unexpected error occurred");
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+## 4. Logging System
+```java
+@Component
+public class LoggingSystem {
+    private final Logger logger = LoggerFactory.getLogger(BankCLI.class);
+
+    // Log user actions
+    public void logUserAction(String username, String action) {
+        logger.info("User {} performed action: {}", username, action);
+    }
+
+    // Log system events
+    public void logSystemEvent(String event) {
+        logger.info("System event: {}", event);
+    }
+
+    // Log errors
+    public void logError(String error, Exception e) {
+        logger.error("Error: {} - {}", error, e.getMessage());
+    }
+}
+```
+
+## 5. Performance Monitoring
+```java
+@Component
+public class PerformanceMonitor {
+    private final Map<String, Long> operationTimes = new HashMap<>();
+
+    // Monitor operation time
+    public void monitorOperation(String operation, Runnable task) {
+        long startTime = System.currentTimeMillis();
+        task.run();
+        long endTime = System.currentTimeMillis();
+        operationTimes.put(operation, endTime - startTime);
+    }
+
+    // Generate performance report
+    public void generatePerformanceReport() {
+        System.out.println("\n=== Performance Report ===");
+        operationTimes.forEach((operation, time) ->
+            System.out.printf("%s: %d ms\n", operation, time));
+    }
+}
+```
+
+## 6. Testing Responsibilities
+### Unit Tests
+- Test cases for:
+  - CLI interface
+  - Input validation
+  - Menu navigation
+  - Error handling
+  - System integration
+  - Performance monitoring
+
+### Integration Tests
+- Test integration with:
+  - User management
+  - Account management
+  - Transaction processing
+  - Admin system
+  - Logging system
+
+## 7. Documentation
+### Technical Documentation
+- Document:
+  - CLI interface
+  - System integration
+  - Error handling
+  - Logging system
+  - Performance monitoring
+  - Configuration
+
+### User Documentation
+- Create guides for:
+  - CLI usage
+  - System setup
+  - Troubleshooting
+  - Performance optimization
+  - Error resolution
+
+## 8. Integration Points
+### With Other Components
+- Coordinate with:
+  - User management (Team Member 1)
+  - Account management (Team Member 2)
+  - Banking operations (Team Member 3)
+  - Admin system (Team Member 4)
+
+## 9. Quality Assurance
+### Code Quality
+- Ensure:
+  - Clean code principles
+  - Proper error handling
+  - User experience
+  - Performance optimization
+  - Documentation standards
+
+### Testing Coverage
+- Maintain:
+  - Unit test coverage
+  - Integration test coverage
+  - User interface testing
+  - Performance testing
+  - Error scenario testing

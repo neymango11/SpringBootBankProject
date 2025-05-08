@@ -1,0 +1,361 @@
+# Team Member 4: Admin & Security
+
+## 1. Admin Entity Implementation (Admin.java)
+### Basic Admin Information
+```java
+@Entity
+@Table(name = "admins")
+public class Admin {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true, nullable = false)
+    private String username;
+
+    @Column(nullable = false)
+    private String password;  // Will be encrypted
+
+    @Column(unique = true, nullable = false)
+    private String email;
+
+    @Column(name = "full_name", nullable = false)
+    private String fullName;
+
+    @Column(name = "role", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private AdminRole role;  // SUPER_ADMIN, ADMIN, SUPPORT
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "last_login")
+    private LocalDateTime lastLogin;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive;
+}
+```
+
+## 2. Admin Service Implementation (AdminService.java)
+### Admin Management
+```java
+@Service
+@Transactional
+public class AdminService {
+    @Autowired
+    private AdminRepository adminRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private AccountRepository accountRepository;
+
+    // Create new admin
+    public Admin createAdmin(AdminCreationDTO dto, Admin creator) {
+        // Verify creator has permission
+        if (!creator.getRole().equals(AdminRole.SUPER_ADMIN)) {
+            throw new UnauthorizedException("Only super admins can create new admins");
+        }
+
+        // Validate input
+        if (adminRepository.existsByUsername(dto.getUsername())) {
+            throw new UsernameExistsException();
+        }
+
+        // Create admin
+        Admin admin = new Admin();
+        admin.setUsername(dto.getUsername());
+        admin.setPassword(passwordEncoder.encode(dto.getPassword()));
+        admin.setEmail(dto.getEmail());
+        admin.setFullName(dto.getFullName());
+        admin.setRole(dto.getRole());
+        admin.setCreatedAt(LocalDateTime.now());
+        admin.setActive(true);
+
+        return adminRepository.save(admin);
+    }
+
+    // Update admin
+    public Admin updateAdmin(Long adminId, AdminUpdateDTO dto, Admin updater) {
+        Admin admin = adminRepository.findById(adminId)
+            .orElseThrow(() -> new AdminNotFoundException());
+
+        // Verify permissions
+        if (!updater.getRole().equals(AdminRole.SUPER_ADMIN) &&
+            !updater.getId().equals(adminId)) {
+            throw new UnauthorizedException();
+        }
+
+        // Update fields
+        admin.setEmail(dto.getEmail());
+        admin.setFullName(dto.getFullName());
+        if (dto.getPassword() != null) {
+            admin.setPassword(passwordEncoder.encode(dto.getPassword()));
+        }
+
+        return adminRepository.save(admin);
+    }
+
+    // Deactivate admin
+    public void deactivateAdmin(Long adminId, Admin deactivator) {
+        if (!deactivator.getRole().equals(AdminRole.SUPER_ADMIN)) {
+            throw new UnauthorizedException();
+        }
+
+        Admin admin = adminRepository.findById(adminId)
+            .orElseThrow(() -> new AdminNotFoundException());
+
+        admin.setActive(false);
+        adminRepository.save(admin);
+    }
+}
+```
+
+## 3. Security Implementation
+### Security Configuration
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf().disable()
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/user/**").hasRole("USER")
+                .anyRequest().authenticated()
+            )
+            .sessionManagement()
+            .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .and()
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+
+### JWT Authentication
+```java
+@Component
+public class JwtTokenProvider {
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
+    @Value("${jwt.expiration}")
+    private long jwtExpiration;
+
+    public String generateToken(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpiration);
+
+        return Jwts.builder()
+                .setSubject(userDetails.getUsername())
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
+                .compact();
+    }
+
+    public String getUsernameFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.getSubject();
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+}
+```
+
+## 4. Audit Logging
+```java
+@Entity
+@Table(name = "audit_logs")
+public class AuditLog {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String action;
+
+    @Column(nullable = false)
+    private String entityType;
+
+    @Column(nullable = false)
+    private Long entityId;
+
+    @Column(nullable = false)
+    private String performedBy;
+
+    @Column(nullable = false)
+    private LocalDateTime timestamp;
+
+    @Column
+    private String details;
+}
+
+@Service
+public class AuditService {
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    public void logAction(String action, String entityType, Long entityId,
+                         String performedBy, String details) {
+        AuditLog log = new AuditLog();
+        log.setAction(action);
+        log.setEntityType(entityType);
+        log.setEntityId(entityId);
+        log.setPerformedBy(performedBy);
+        log.setTimestamp(LocalDateTime.now());
+        log.setDetails(details);
+
+        auditLogRepository.save(log);
+    }
+}
+```
+
+## 5. Access Control
+```java
+@Service
+public class AccessControlService {
+    // Role-based access control
+    public boolean hasPermission(Admin admin, String resource, String action) {
+        switch (admin.getRole()) {
+            case SUPER_ADMIN:
+                return true;
+            case ADMIN:
+                return isAdminAllowed(resource, action);
+            case SUPPORT:
+                return isSupportAllowed(resource, action);
+            default:
+                return false;
+        }
+    }
+
+    // Resource access validation
+    private boolean isAdminAllowed(String resource, String action) {
+        Map<String, Set<String>> adminPermissions = new HashMap<>();
+        adminPermissions.put("user", Set.of("read", "update"));
+        adminPermissions.put("account", Set.of("read", "update", "create"));
+        adminPermissions.put("transaction", Set.of("read", "approve"));
+
+        return adminPermissions.containsKey(resource) &&
+               adminPermissions.get(resource).contains(action);
+    }
+}
+```
+
+## 6. Security Monitoring
+```java
+@Service
+public class SecurityMonitoringService {
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    // Monitor failed login attempts
+    public void monitorFailedLogins(String username) {
+        int failedAttempts = getFailedLoginAttempts(username);
+        if (failedAttempts >= 5) {
+            lockAccount(username);
+            notifySecurityTeam(username);
+        }
+    }
+
+    // Monitor suspicious activities
+    public void monitorSuspiciousActivity(String username, String action) {
+        if (isSuspiciousAction(action)) {
+            flagAccount(username);
+            notifySecurityTeam(username);
+        }
+    }
+
+    // Generate security reports
+    public SecurityReport generateSecurityReport(LocalDateTime startDate,
+                                               LocalDateTime endDate) {
+        List<AuditLog> logs = auditLogRepository.findByDateRange(startDate, endDate);
+        return new SecurityReport(logs);
+    }
+}
+```
+
+## 7. Testing Responsibilities
+### Unit Tests
+- Test cases for:
+  - Admin operations
+  - Authentication
+  - Authorization
+  - Audit logging
+  - Security monitoring
+  - Access control
+
+### Integration Tests
+- Test integration with:
+  - User management
+  - Account management
+  - Transaction processing
+  - Security system
+  - Monitoring system
+
+## 8. Documentation
+### Technical Documentation
+- Document:
+  - Security configuration
+  - Admin operations
+  - Authentication process
+  - Authorization rules
+  - Audit logging
+  - Security monitoring
+
+### User Documentation
+- Create guides for:
+  - Admin operations
+  - Security procedures
+  - Access control
+  - Monitoring system
+  - Incident response
+
+## 9. Integration Points
+### With Other Components
+- Coordinate with:
+  - User management (Team Member 1)
+  - Account management (Team Member 2)
+  - Banking operations (Team Member 3)
+  - CLI interface (Team Member 5)
+
+## 10. Quality Assurance
+### Code Quality
+- Ensure:
+  - Security best practices
+  - Proper error handling
+  - Audit trail
+  - Access control
+  - Documentation standards
+
+### Testing Coverage
+- Maintain:
+  - Security testing
+  - Penetration testing
+  - Access control testing
+  - Audit logging testing
+  - Monitoring system testing

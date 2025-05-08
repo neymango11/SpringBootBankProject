@@ -1,0 +1,317 @@
+# Team Member 3: Banking Operations & Business Logic
+
+## 1. Bank Service Implementation (BankService.java)
+### Core Banking Operations
+```java
+@Service
+@Transactional
+public class BankService {
+    @Autowired
+    private AccountRepository accountRepository;
+    @Autowired
+    private TransactionRepository transactionRepository;
+    @Autowired
+    private UserRepository userRepository;
+
+    // Deposit Operation
+    public Transaction deposit(String accountNumber, BigDecimal amount) {
+        // Validate deposit amount
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidAmountException("Deposit amount must be positive");
+        }
+
+        // Get account and validate
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException());
+
+        // Check account status
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+
+        // Process deposit
+        account.setBalance(account.getBalance().add(amount));
+        accountRepository.save(account);
+
+        // Create transaction record
+        Transaction transaction = new Transaction();
+        transaction.setAccount(account);
+        transaction.setType(TransactionType.DEPOSIT);
+        transaction.setAmount(amount);
+        transaction.setStatus(TransactionStatus.COMPLETED);
+        transaction.setDescription("Deposit transaction");
+
+        return transactionRepository.save(transaction);
+    }
+
+    // Withdrawal Operation
+    public Transaction withdraw(String accountNumber, BigDecimal amount) {
+        // Validate withdrawal amount
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidAmountException("Withdrawal amount must be positive");
+        }
+
+        // Get account and validate
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException());
+
+        // Check sufficient funds
+        if (account.getBalance().compareTo(amount) < 0) {
+            if (!account.isOverdraftProtection()) {
+                throw new InsufficientFundsException();
+            }
+            // Apply overdraft fee
+            amount = amount.add(calculateOverdraftFee());
+        }
+
+        // Process withdrawal
+        account.setBalance(account.getBalance().subtract(amount));
+        accountRepository.save(account);
+
+        // Create transaction record
+        Transaction transaction = new Transaction();
+        transaction.setAccount(account);
+        transaction.setType(TransactionType.WITHDRAWAL);
+        transaction.setAmount(amount);
+        transaction.setStatus(TransactionStatus.COMPLETED);
+        transaction.setDescription("Withdrawal transaction");
+
+        return transactionRepository.save(transaction);
+    }
+
+    // Transfer Operation
+    public Transaction transfer(String fromAccountNumber, String toAccountNumber, BigDecimal amount) {
+        // Validate transfer amount
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidAmountException("Transfer amount must be positive");
+        }
+
+        // Get both accounts
+        Account fromAccount = accountRepository.findByAccountNumber(fromAccountNumber)
+            .orElseThrow(() -> new AccountNotFoundException());
+        Account toAccount = accountRepository.findByAccountNumber(toAccountNumber)
+            .orElseThrow(() -> new AccountNotFoundException());
+
+        // Validate accounts
+        if (fromAccount.getStatus() != AccountStatus.ACTIVE ||
+            toAccount.getStatus() != AccountStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+
+        // Process transfer
+        try {
+            // Withdraw from source account
+            withdraw(fromAccountNumber, amount);
+            // Deposit to target account
+            deposit(toAccountNumber, amount);
+
+            // Create transfer transaction record
+            Transaction transaction = new Transaction();
+            transaction.setAccount(fromAccount);
+            transaction.setType(TransactionType.TRANSFER);
+            transaction.setAmount(amount);
+            transaction.setStatus(TransactionStatus.COMPLETED);
+            transaction.setDescription("Transfer to account: " + toAccountNumber);
+
+            return transactionRepository.save(transaction);
+        } catch (Exception e) {
+            throw new TransferFailedException("Transfer failed: " + e.getMessage());
+        }
+    }
+}
+```
+
+## 2. Business Rules Implementation
+### Account Rules
+```java
+@Service
+public class AccountRulesService {
+    // Minimum Balance Rules
+    public void validateMinimumBalance(Account account, BigDecimal amount) {
+        BigDecimal newBalance = account.getBalance().subtract(amount);
+        if (newBalance.compareTo(account.getMinimumBalance()) < 0) {
+            throw new MinimumBalanceException();
+        }
+    }
+
+    // Transaction Limits
+    public void validateTransactionLimit(Account account, BigDecimal amount) {
+        BigDecimal dailyLimit = getDailyTransactionLimit(account);
+        BigDecimal dailyTotal = getDailyTransactionTotal(account);
+
+        if (dailyTotal.add(amount).compareTo(dailyLimit) > 0) {
+            throw new TransactionLimitExceededException();
+        }
+    }
+
+    // Interest Calculation
+    public BigDecimal calculateInterest(Account account) {
+        if (account.getAccountType() != AccountType.SAVINGS) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal balance = account.getBalance();
+        BigDecimal apy = account.getApy();
+        LocalDateTime lastCalculation = account.getLastInterestCalculation();
+        LocalDateTime now = LocalDateTime.now();
+
+        // Calculate days between calculations
+        long days = ChronoUnit.DAYS.between(lastCalculation, now);
+
+        // Calculate interest
+        return balance.multiply(apy)
+                     .multiply(BigDecimal.valueOf(days))
+                     .divide(BigDecimal.valueOf(365), 2, RoundingMode.HALF_UP);
+    }
+}
+```
+
+## 3. Fee Management
+```java
+@Service
+public class FeeManagementService {
+    // Overdraft Fee
+    public BigDecimal calculateOverdraftFee() {
+        return new BigDecimal("35.00"); // Standard overdraft fee
+    }
+
+    // Monthly Maintenance Fee
+    public BigDecimal calculateMaintenanceFee(Account account) {
+        if (account.getBalance().compareTo(new BigDecimal("1000")) >= 0) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal("12.00"); // Monthly maintenance fee
+    }
+
+    // ATM Fee
+    public BigDecimal calculateATMFee(Account account, boolean isOutOfNetwork) {
+        if (isOutOfNetwork) {
+            return new BigDecimal("3.00"); // Out-of-network ATM fee
+        }
+        return BigDecimal.ZERO;
+    }
+}
+```
+
+## 4. Transaction Validation
+```java
+@Service
+public class TransactionValidationService {
+    // Amount Validation
+    public void validateAmount(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidAmountException("Amount must be positive");
+        }
+    }
+
+    // Account Status Validation
+    public void validateAccountStatus(Account account) {
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new AccountInactiveException();
+        }
+    }
+
+    // Fraud Detection
+    public void checkForFraudulentActivity(Account account, Transaction transaction) {
+        // Check for unusual transaction patterns
+        if (isUnusualAmount(transaction.getAmount()) ||
+            isUnusualLocation(transaction) ||
+            isUnusualTime(transaction)) {
+            flagForReview(account, transaction);
+        }
+    }
+}
+```
+
+## 5. Reporting Service
+```java
+@Service
+public class ReportingService {
+    // Transaction History
+    public List<Transaction> getTransactionHistory(String accountNumber,
+                                                 LocalDateTime startDate,
+                                                 LocalDateTime endDate) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException());
+
+        return transactionRepository.findByAccountIdAndDateRange(
+            account.getId(), startDate, endDate);
+    }
+
+    // Account Statement
+    public AccountStatement generateStatement(String accountNumber,
+                                            LocalDateTime startDate,
+                                            LocalDateTime endDate) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+            .orElseThrow(() -> new AccountNotFoundException());
+
+        List<Transaction> transactions = getTransactionHistory(
+            accountNumber, startDate, endDate);
+
+        return new AccountStatement(account, transactions, startDate, endDate);
+    }
+}
+```
+
+## 6. Testing Responsibilities
+### Unit Tests
+- Test cases for:
+  - Deposit operations
+  - Withdrawal operations
+  - Transfer operations
+  - Interest calculations
+  - Fee calculations
+  - Transaction validation
+  - Business rules
+  - Reporting functions
+
+### Integration Tests
+- Test integration with:
+  - Account management
+  - Transaction processing
+  - User management
+  - Security system
+  - Reporting system
+
+## 7. Documentation
+### Technical Documentation
+- Document:
+  - Banking operations
+  - Business rules
+  - Fee structures
+  - Transaction validation
+  - Reporting functions
+  - API endpoints
+
+### User Documentation
+- Create guides for:
+  - Transaction processing
+  - Fee structures
+  - Account rules
+  - Reporting features
+  - Error handling
+
+## 8. Integration Points
+### With Other Components
+- Coordinate with:
+  - Account management (Team Member 2)
+  - User management (Team Member 1)
+  - Security system (Team Member 4)
+  - CLI interface (Team Member 5)
+
+## 9. Quality Assurance
+### Code Quality
+- Ensure:
+  - Clean code principles
+  - Proper error handling
+  - Transaction integrity
+  - Business rule compliance
+  - Documentation standards
+
+### Testing Coverage
+- Maintain:
+  - Unit test coverage
+  - Integration test coverage
+  - Business rule testing
+  - Transaction testing
+  - Error scenario testing

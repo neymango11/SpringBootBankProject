@@ -1,0 +1,422 @@
+# Team Member 1: User Management & Authentication
+
+## 1. User Entity Implementation (User.java)
+### Basic User Information
+- Implement user entity with required fields:
+  ```java
+  @Entity
+  @Table(name = "users")
+  public class User {
+      @Id
+      @GeneratedValue(strategy = GenerationType.IDENTITY)
+      private Long id;
+
+      @Column(unique = true, nullable = false)
+      private String username;
+
+      @Column(nullable = false)
+      private String password;  // Will be encrypted
+
+      @Column(unique = true, nullable = false)
+      private String email;
+
+      @Column(nullable = false)
+      private String fullName;
+
+      @Column(nullable = false)
+      private String address;
+
+      @Column(nullable = false)
+      private String phoneNumber;
+  }
+  ```
+
+### Security & Status Fields
+- Add security-related fields:
+  ```java
+  @Column(nullable = false)
+  private boolean isActive;
+
+  @Column(nullable = false)
+  private LocalDateTime createdAt;
+
+  @Column
+  private LocalDateTime lastLoginDate;
+
+  @Column
+  private int failedLoginAttempts;
+
+  @Column
+  private boolean isLocked;
+
+  @Column
+  private String resetPasswordToken;
+
+  @Column
+  private LocalDateTime resetPasswordExpiry;
+  ```
+
+### Validation & Constraints
+- Implement validation annotations:
+  ```java
+  @Email(message = "Invalid email format")
+  private String email;
+
+  @Size(min = 8, message = "Password must be at least 8 characters")
+  private String password;
+
+  @Pattern(regexp = "^\\d{10}$", message = "Phone number must be 10 digits")
+  private String phoneNumber;
+  ```
+
+## 2. User Repository Implementation (UserRepository.java)
+### Basic CRUD Operations
+- Create standard repository methods:
+  ```java
+  @Repository
+  public interface UserRepository extends JpaRepository<User, Long> {
+      Optional<User> findByUsername(String username);
+      Optional<User> findByEmail(String email);
+      boolean existsByUsername(String username);
+      boolean existsByEmail(String email);
+  }
+  ```
+
+### Custom Queries
+- Implement search functionality:
+  ```java
+  @Query("SELECT u FROM User u WHERE u.fullName LIKE %:searchTerm%")
+  List<User> searchByName(@Param("searchTerm") String searchTerm);
+
+  @Query("SELECT u FROM User u WHERE u.isActive = :status")
+  List<User> findByStatus(@Param("status") boolean status);
+  ```
+
+## 3. User Service Implementation
+### Registration Service
+- Create user registration logic:
+  ```java
+  @Service
+  public class UserService {
+      public User registerUser(UserRegistrationDTO dto) {
+          // Validate input
+          validateRegistrationInput(dto);
+
+          // Check for existing user
+          if (userRepository.existsByUsername(dto.getUsername())) {
+              throw new UsernameExistsException();
+          }
+
+          // Create new user
+          User user = new User();
+          user.setUsername(dto.getUsername());
+          user.setPassword(passwordEncoder.encode(dto.getPassword()));
+          user.setEmail(dto.getEmail());
+          // Set other fields...
+
+          return userRepository.save(user);
+      }
+  }
+  ```
+
+### Authentication Service
+- Implement login functionality:
+  ```java
+  public User login(String username, String password) {
+      User user = userRepository.findByUsername(username)
+          .orElseThrow(() -> new UserNotFoundException());
+
+      if (user.isLocked()) {
+          throw new AccountLockedException();
+      }
+
+      if (!passwordEncoder.matches(password, user.getPassword())) {
+          handleFailedLogin(user);
+          throw new InvalidCredentialsException();
+      }
+
+      updateLoginSuccess(user);
+      return user;
+  }
+  ```
+
+### Profile Management
+- Create profile update methods:
+  ```java
+  public User updateProfile(Long userId, ProfileUpdateDTO dto) {
+      User user = userRepository.findById(userId)
+          .orElseThrow(() -> new UserNotFoundException());
+
+      // Update fields
+      user.setFullName(dto.getFullName());
+      user.setAddress(dto.getAddress());
+      user.setPhoneNumber(dto.getPhoneNumber());
+
+      return userRepository.save(user);
+  }
+  ```
+
+## 4. Security Implementation
+### Password Management
+- Implement password operations:
+  ```java
+  public void changePassword(Long userId, PasswordChangeDTO dto) {
+      User user = userRepository.findById(userId)
+          .orElseThrow(() -> new UserNotFoundException());
+
+      if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+          throw new InvalidPasswordException();
+      }
+
+      user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+      userRepository.save(user);
+  }
+  ```
+
+### Account Security
+- Implement security features:
+  ```java
+  private void handleFailedLogin(User user) {
+      user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
+      if (user.getFailedLoginAttempts() >= MAX_FAILED_ATTEMPTS) {
+          user.setLocked(true);
+      }
+      userRepository.save(user);
+  }
+  ```
+
+## 5. Testing Responsibilities
+### Unit Tests
+- Create test cases for:
+  - User entity validation
+  - Repository operations
+  - Service layer methods
+  - Security features
+  - Error handling
+
+### Integration Tests
+- Test integration with:
+  - Database operations
+  - Security system
+  - Other services
+  - API endpoints
+
+## 6. Documentation
+### Technical Documentation
+- Document:
+  - Entity structure
+  - Repository methods
+  - Service operations
+  - Security features
+  - API endpoints
+
+### User Documentation
+- Create guides for:
+  - Registration process
+  - Login procedures
+  - Profile management
+  - Security features
+  - Troubleshooting
+
+## 7. Integration Points
+### With Other Components
+- Coordinate with:
+  - Account management (Team Member 2)
+  - Security system (Team Member 4)
+  - CLI interface (Team Member 5)
+  - Database team
+  - Testing team
+
+## 8. Quality Assurance
+### Code Quality
+- Ensure:
+  - Clean code principles
+  - Proper error handling
+  - Security best practices
+  - Performance optimization
+  - Documentation standards
+
+### Testing Coverage
+- Maintain:
+  - Unit test coverage
+  - Integration test coverage
+  - Security test coverage
+  - Performance test coverage
+  - User acceptance testing
+
+
+
+  // User.java - Main entity class for user management
+  @Entity  // Marks this class as a JPA entity
+  @Table(name = "users")  // Specifies the database table name
+  public class User {
+      // Primary key for the user, auto-generated
+      @Id
+      @GeneratedValue(strategy = GenerationType.IDENTITY)
+      private Long id;
+
+      // Username field - must be unique and cannot be null
+      @Column(unique = true, nullable = false)
+      private String username;
+
+      // Password field - will be encrypted before storage
+      @Column(nullable = false)
+      private String password;
+
+      // Email field - must be unique and cannot be null
+      @Column(unique = true, nullable = false)
+      private String email;
+
+      // User's full name
+      @Column(nullable = false)
+      private String fullName;
+
+      // User's physical address
+      @Column(nullable = false)
+      private String address;
+
+      // User's contact number
+      @Column(nullable = false)
+      private String phoneNumber;
+
+      // Flag to indicate if the user is an admin
+      @Column(nullable = false)
+      private boolean isAdmin;
+
+      // Timestamp for when the user was created
+      @Column(nullable = false)
+      private LocalDateTime createdAt;
+
+      // Method to automatically set creation timestamp
+      @PrePersist
+      protected void onCreate() {
+          createdAt = LocalDateTime.now();
+      }
+  }
+
+  // UserRepository.java - Data access layer for User entity
+  @Repository  // Marks this interface as a Spring Data repository
+  public interface UserRepository extends JpaRepository<User, Long> {
+      // Find a user by their username
+      Optional<User> findByUsername(String username);
+
+      // Check if a username already exists
+      boolean existsByUsername(String username);
+
+      // Check if an email already exists
+      boolean existsByEmail(String email);
+  }
+
+  // UserService.java - Business logic layer for user management
+  @Service  // Marks this class as a Spring service
+  @Transactional  // Ensures all methods are executed in a transaction
+  public class UserService {
+      // Dependency injection of the user repository
+      @Autowired
+      private UserRepository userRepository;
+
+      // Password encoder for secure password handling
+      @Autowired
+      private PasswordEncoder passwordEncoder;
+
+      /**
+       * Creates a new user in the system
+       * @param user The user object to be created
+       * @return The created user with generated ID
+       * @throws RuntimeException if username or email already exists
+       */
+      public User createUser(User user) {
+          // Check if username already exists
+          if (userRepository.existsByUsername(user.getUsername())) {
+              throw new RuntimeException("Username already exists");
+          }
+
+          // Check if email already exists
+          if (userRepository.existsByEmail(user.getEmail())) {
+              throw new RuntimeException("Email already registered");
+          }
+
+          // Encode the password before saving
+          user.setPassword(passwordEncoder.encode(user.getPassword()));
+
+          // Set default values
+          user.setAdmin(false);
+          user.setCreatedAt(LocalDateTime.now());
+
+          // Save and return the user
+          return userRepository.save(user);
+      }
+
+      /**
+       * Authenticates a user
+       * @param username The username to authenticate
+       * @param password The password to verify
+       * @return The authenticated user
+       * @throws RuntimeException if authentication fails
+       */
+      public User login(String username, String password) {
+          // Find user by username
+          return userRepository.findByUsername(username)
+                  .filter(user -> passwordEncoder.matches(password, user.getPassword()))
+                  .orElseThrow(() -> new RuntimeException("Invalid username or password"));
+      }
+
+      /**
+       * Updates a user's profile
+       * @param userId The ID of the user to update
+       * @param updatedUser The updated user information
+       * @return The updated user
+       * @throws RuntimeException if user not found
+       */
+      public User updateUser(Long userId, User updatedUser) {
+          // Find existing user
+          User existingUser = userRepository.findById(userId)
+                  .orElseThrow(() -> new RuntimeException("User not found"));
+
+          // Update fields
+          existingUser.setFullName(updatedUser.getFullName());
+          existingUser.setAddress(updatedUser.getAddress());
+          existingUser.setPhoneNumber(updatedUser.getPhoneNumber());
+          existingUser.setEmail(updatedUser.getEmail());
+
+          // Save and return updated user
+          return userRepository.save(existingUser);
+      }
+
+      /**
+       * Changes a user's password
+       * @param userId The ID of the user
+       * @param oldPassword The current password
+       * @param newPassword The new password
+       * @throws RuntimeException if old password is incorrect
+       */
+      public void changePassword(Long userId, String oldPassword, String newPassword) {
+          // Find user
+          User user = userRepository.findById(userId)
+                  .orElseThrow(() -> new RuntimeException("User not found"));
+
+          // Verify old password
+          if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+              throw new RuntimeException("Current password is incorrect");
+          }
+
+          // Update password
+          user.setPassword(passwordEncoder.encode(newPassword));
+          userRepository.save(user);
+      }
+
+      /**
+       * Deactivates a user account
+       * @param userId The ID of the user to deactivate
+       * @throws RuntimeException if user not found
+       */
+      public void deactivateUser(Long userId) {
+          // Find user
+          User user = userRepository.findById(userId)
+                  .orElseThrow(() -> new RuntimeException("User not found"));
+
+          // Deactivate user
+          user.setActive(false);
+          userRepository.save(user);
+      }
+  }

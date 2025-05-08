@@ -16,12 +16,19 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * Stores all important details about a user's account
+ * Like account number, type (checking or savings), balance, and owner
+ * Each account has a unique ID and account number
+ *
+ */
+
 @Entity
 @Table(name = "accounts")
-@Getter
-@Setter
+@Getter // automatically creates getter and setter methods for all the fields in your class
+@Setter // using lomboks library
 public class Account {
-    @Id
+    @Id // every table needs a primary key
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -85,6 +92,7 @@ public class Account {
         return accountHolderName;
     }
 
+    //makes sure that if apy is null, it returns 0 instead with lomboks deafult version it would just return null
     public BigDecimal getApy() {
         return apy != null ? apy : BigDecimal.ZERO;
     }
